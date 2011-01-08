@@ -3,21 +3,13 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as string]))
 
-;(defprotocol Post
-  ;(publish-date [post])
-  ;(title [post])
-  ;(publish? [post])
-  ;(tags [post])
-  ;(url [post])
-  ;(content [post]))
-
 (defn read-pages [dir]
   (let [files (filter #(and (.isFile %)
                             (.endsWith (.getName %) ".clj"))
                       (file-seq (io/file dir)))]
     (map
       (fn [file]
-        (prn (str "Processing " file))
+        (println (str "Processing " file))
         (load-file (str file)))
       files)))
 
@@ -27,7 +19,7 @@
                       (file-seq (io/file dir)))]
     (map
       (fn [file]
-        (prn (str "Processing " file))
+        (println (str "Processing " file))
         (load-file (str file)))
       files)))
 
@@ -53,24 +45,25 @@
   (let [site-data (assoc site-data :posts posts)]
     (pmap (partial process site-data) pages)))
 
+;fixme 
 (defn url-to-path [url]
   (string/replace (str "site/" url) "-" "_"))
 
-(defn save-html [post-or-page]
+(defn save-html [base-dir post-or-page]
   (let [{:keys [url content]} post-or-page
-        path (url-to-path url)]
-    (.mkdirs (.getParentFile (io/file path)))
-    (spit path content)))
+        path (io/file base-dir (url-to-path url))]
+    (.mkdirs (.getParentFile path))
+    (spit (.getAbsolutePath path) content)))
 
 (defn generate [config]
   (let [{:keys [source-dir dest-dir]} config
-        posts-dir (file source-dir "posts")
-        pages-dir (file source-dir "public/html")
+        posts-dir (io/file source-dir "posts")
+        pages-dir (io/file source-dir "public/html")
         data (site-data)
         posts (published-posts (read-posts posts-dir))
         posts (process-posts posts data)
         pages (process-pages (read-pages pages-dir) posts data)]
-    (doall (map save-html posts))
-    (doall (map save-html pages)))
+    (doall (map (partial save-html dest-dir) posts))
+    (doall (map (partial save-html dest-dir) pages)))
   (shutdown-agents))
 
