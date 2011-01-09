@@ -3,26 +3,18 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as string]))
 
-(defn read-pages [dir]
-  (let [files (filter #(and (.isFile %)
-                            (.endsWith (.getName %) ".clj"))
-                      (file-seq (io/file dir)))]
-    (map
-      (fn [file]
-        (println (str "Processing " file))
-        (load-file (str file)))
-      files)))
+(defn- is-clojure? [file]
+  (.endsWith (.getName file) ".clj"))
 
-(defn read-posts [dir]
-  (let [files (filter #(and (.isFile %)
-                            (.endsWith (.getName %) ".clj"))
-                      (file-seq (io/file dir)))]
-    (map
-      (fn [file]
-        (println (str "Processing " file))
-        (load-file (str file)))
-      files)))
+(defn separate [f coll]
+  [(filter f coll)
+   (filter (complement f) coll)])
 
+(defn glob [dir]
+  (let [files (filter (memfn isFile) (file-seq (io/file dir)))]
+    (separate is-clojure? files)))
+
+(defn- read-file [f] (load-file (str f)))
 
 (defn published-posts [posts]
   (filter :publish? posts))
@@ -30,24 +22,48 @@
 (defn site-data []
   {:now (Date.)})
 
-
 (defn process [site-data post]
   (reduce
     (fn [res [k v]]
       (assoc res k (v site-data)))
-    {} post))
+    {}
+    post))
 
-(defn process-posts [posts site-data]
+(defn- first-pass-processor [site-data]
+  (fn [post]
+    (merge
+      post
+      (reduce
+        (fn [res [k v]]
+          (assoc res k (v site-data)))
+        {}
+        (dissoc post :content)))))
+
+(defn- second-pass-processor [site-data]
+  (fn [post]
+    (assoc post :content ((:content post) site-data))))
+
+(defn process-posts-1st-pass [site-data posts]
   (sort-by #(-> % :publish-date .getTime -)
-           (pmap (partial process site-data) posts)))
+           (pmap
+             (first-pass-processor site-data)
+             posts)))
+
+(defn process-posts-2nd-pass [site-data posts]
+  (pmap (second-pass-processor site-data) posts))
+
+(defn process-posts [site-data posts]
+  (let [fst-pass (process-posts-1st-pass site-data posts)]
+    (process-posts-2nd-pass (assoc site-data :posts fst-pass)
+                            fst-pass)))
 
 (defn process-pages [pages posts site-data]
-  (let [site-data (assoc site-data :posts posts)]
-    (pmap (partial process site-data) pages)))
+  (pmap (partial process (assoc site-data :posts posts))
+        pages))
 
 ;fixme 
 (defn url-to-path [url]
-  (string/replace (str "site/" url) "-" "_"))
+  (string/replace url "-" "_"))
 
 (defn save-html [base-dir post-or-page]
   (let [{:keys [url content]} post-or-page
@@ -55,15 +71,28 @@
     (.mkdirs (.getParentFile path))
     (spit (.getAbsolutePath path) content)))
 
+(defn copy-resource [base-dir dest-dir file]
+  (let [rel-path (string/replace (.getAbsolutePath file) (.getAbsolutePath base-dir) "")
+        rel-path (string/replace rel-path #"^[/\\]" "")
+        dest-file (io/file dest-dir rel-path)]
+    (.. dest-file (getParentFile) (mkdirs))
+    (io/copy file dest-file)))
+
 (defn generate [config]
   (let [{:keys [source-dir dest-dir]} config
         posts-dir (io/file source-dir "posts")
-        pages-dir (io/file source-dir "public/html")
+        pages-dir (io/file source-dir "public")
         data (site-data)
-        posts (published-posts (read-posts posts-dir))
-        posts (process-posts posts data)
-        pages (process-pages (read-pages pages-dir) posts data)]
+        post-files (first (glob posts-dir))
+        post-templates (filter published-posts (map read-file post-files))
+        posts (process-posts data post-templates)
+        [template-pages resource-files] (glob pages-dir)
+        pages (process-pages (map read-file template-pages) posts data)]
+    (println "Saving posts")
     (doall (map (partial save-html dest-dir) posts))
-    (doall (map (partial save-html dest-dir) pages)))
+    (println "Saving html files")
+    (doall (map (partial save-html dest-dir) pages))
+    (println "Copying resource files")
+    (doall (map (partial copy-resource pages-dir dest-dir) resource-files)))
   (shutdown-agents))
 
