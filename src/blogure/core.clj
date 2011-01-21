@@ -1,6 +1,7 @@
 (ns blogure.core
   (:import java.util.Date)
   (:require [clojure.java.io :as io]
+            [clojure.set :as cljset]
             [clojure.string :as string]
             [clojure.contrib.graph :as gr]
             [clojure.contrib.with-ns :as cns]))
@@ -105,7 +106,7 @@
   (let [[nodes neigh] (reduce
                         (fn [[nodes neigh] {:keys [target dependencies]}]
                           [(conj nodes target)
-                           (merge-with concat neigh {target dependencies})])
+                           (merge-with cljset/union neigh {target (set dependencies)})])
                         [#{} {}]
                         generators)]
     (struct gr/directed-graph nodes neigh)))
