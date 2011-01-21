@@ -1,5 +1,6 @@
 (ns blogure.helpers
   (require [clojure.pprint :as pp]
+           [clojure.java.io :as io]
            [clojure.string :as string]))
 
 (defn- make-triplett [[{next :url} {post :url} {prev :url}]]
@@ -41,6 +42,13 @@
 (defn- find-sorted-post [coll url]
   (some #(if (= (:post %) url) %) coll))
 
+(defn save-html [base-path url content]
+  (if base-path
+    (let [path (string/replace url "-" "_") ;fixme
+          path (io/file base-path path)]
+      (.mkdirs (.getParentFile path))
+      (spit (.getAbsolutePath path) content))))
+
 (defn- create-post-producer [url content-function]
   (fn [site-data]
     (let [{:keys [post next prev]} (find-sorted-post (:sorted-posts site-data) url)
@@ -48,9 +56,10 @@
           next (get-in site-data [:posts-metadata next])
           prev (get-in site-data [:posts-metadata prev])
           content (content-function site-data prev next)]
+      (save-html (:base-path site-data) url content)
       (assoc-in site-data [:posts url] (assoc this-post :content content)))))
 
-(defn post-url [title]
+(defn post-url [title] ;fixme
   (string/replace title #"\W" "-"))
 
 (defn make-post [title date content-function]

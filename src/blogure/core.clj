@@ -71,11 +71,11 @@
 (defn url-to-path [url]
   (string/replace url "-" "_"))
 
-(defn save-html [base-dir post-or-page]
-  (let [{:keys [url content]} post-or-page
-        path (io/file base-dir (url-to-path url))]
-    (.mkdirs (.getParentFile path))
-    (spit (.getAbsolutePath path) content)))
+;(defn save-html [base-dir post-or-page]
+  ;(let [{:keys [url content]} post-or-page
+        ;path (io/file base-dir (url-to-path url))]
+    ;(.mkdirs (.getParentFile path))
+    ;(spit (.getAbsolutePath path) content)))
 
 (defn copy-resource [base-dir dest-dir file]
   (let [rel-path (string/replace (.getAbsolutePath file) (.getAbsolutePath base-dir) "")

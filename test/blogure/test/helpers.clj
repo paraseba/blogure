@@ -1,6 +1,6 @@
 (ns blogure.test.helpers
   (:require [clj-time.core :as t])
-  (:use blogure.core clojure.test)
+  (:use blogure.core clojure.test clojure.contrib.java-utils)
   (:use [blogure.helpers] :reload))
 
 (def now (t/now))
@@ -70,4 +70,15 @@
         post-generators (concat post1 post2 post3)
         generators (concat sys-generators post-generators)]
    (generate generators {})))
+
+(deftest generate-post-files
+  (let [sys-generators (blog-generators 3)
+        post1 (simple-post 40 "post one" "This is post one")
+        post2 (simple-post 30 "post two" "This is post two")
+        post-generators (concat post1 post2)
+        generators (concat sys-generators post-generators)
+        tmp (file (get-system-property "java.io.tmpdir") "blogure_test")
+        res (generate generators {:base-path tmp})]
+    (is (= "This is post one" (slurp (file tmp "post_one"))))
+    (is (= "This is post two" (slurp (file tmp "post_two"))))))
 
