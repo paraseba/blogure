@@ -135,3 +135,8 @@
       site-data
       all-producers)))
 
+(defn file->generator [path]
+  (load-file (str path)))
+
+(defn dir->generators [path]
+  (map file->generator (first (glob path))))
