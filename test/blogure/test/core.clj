@@ -42,10 +42,11 @@
     (is (= 4 @counter))))
 
 (deftest generator-from-files
-  (is (= {:target :a, :dependencies [], :provider inc}
-         (file->generator "test/resources/basic-generators.clj")))
+  (is (= [{:target :a, :dependencies [], :provider inc}
+          {:target :z, :dependencies [:a], :provider dec}]
+         (file->generators "test/resources/basic-generators.clj")))
   (is (= #{{:target :a, :dependencies [], :provider inc}
+           {:target :z, :dependencies [:a], :provider dec}
            {:target :b, :dependencies [], :provider inc}}
-         (set (dir->generators "test/resources"))))
-         )
+         (set (dir->generators "test/resources")))))
 
